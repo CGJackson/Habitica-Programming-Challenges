@@ -51,7 +51,8 @@ updateRanges hyperplane ranges = sequence (map updateRange (zip ranges [0,1..]))
 insertValues:: Hyperplane -> [SymbolRange] -> [[SymbolValue]]
 insertValues _ [] = []
 insertValues _ (possibleValueRange:[]) = map (:[]) (expandRange possibleValueRange)
-insertValues hyperplane (guessRange:remainingRanges) = [[x:solution| solution <- (solve (sectionHyperplane 0 x hyperplane) remainingRanges)] |x <- (expandRange guessRange)]
+insertValues hyperplane (guessRange:remainingRanges) = [[x:solution| solution <- (solveWithSubstitution x)] |x <- (expandRange guessRange)]
+    where solveWithSubstitution x = solve (sectionHyperplane 0 x hyperplane) remainingRanges
 
 -- Recursivly solves the Word Sum problem by alternatly trying to tighten the bounds
 -- on the possible values of each symbol and substituting in values to try all possiblities
