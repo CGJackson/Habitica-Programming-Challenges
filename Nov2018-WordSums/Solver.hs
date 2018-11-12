@@ -12,9 +12,9 @@
 
 import Utils (Hyperplane(..), normalVectorComponent, sectionHyperplane, dimensionOfHyperplane , SymbolValue, SymbolRange, expandRange, divUp)
 
---module Solver 
---( solve
---) where
+module Solver 
+( solve
+) where
 
 -- Finds the largest and smallest possible values for the symbol at position 'index' consistent with the 
 -- known bounds on the other variables. This amounts to finding the points where the hyperplane 
