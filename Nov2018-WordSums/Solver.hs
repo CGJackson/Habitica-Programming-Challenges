@@ -10,11 +10,12 @@
 -- amounts to finding the points on an N-1 dimensional
 -- hyperplane with natural number coordinates <= 9
 
-import Utils (Hyperplane(..), normalVectorComponent, sectionHyperplane, dimensionOfHyperplane , SymbolValue, SymbolRange, expandRange, divUp)
-
 module Solver 
 ( solve
 ) where
+
+import Utils (Hyperplane(..), normalVectorComponent, sectionHyperplane, dimensionOfHyperplane , SymbolValue, SymbolRange, expandRange, divUp)
+
 
 -- Finds the largest and smallest possible values for the symbol at position 'index' consistent with the 
 -- known bounds on the other variables. This amounts to finding the points where the hyperplane 
@@ -51,8 +52,9 @@ updateRanges hyperplane ranges = sequence (map updateRange (zip ranges [0,1..]))
 insertValues:: Hyperplane -> [SymbolRange] -> [[SymbolValue]]
 insertValues _ [] = []
 insertValues _ (possibleValueRange:[]) = map (:[]) (expandRange possibleValueRange)
-insertValues hyperplane (guessRange:remainingRanges) = concat [[x:solution| solution <- (solveWithSubstitution x)] |x <- (expandRange guessRange)]
-    where solveWithSubstitution x = solve (sectionHyperplane 0 x hyperplane) remainingRanges
+insertValues hyperplane (guessRange:remainingRanges) = concat $ map solutionsWithSubstitution (expandRange guessRange)
+    where solveWithSubstitution trialValue = solve (sectionHyperplane 0 trialValue hyperplane) remainingRanges
+          solutionsWithSubstitution trialValue = [trialValue:solution| solution <- (solveWithSubstitution trialValue)]
 
 -- Recursivly solves the Word Sum problem by alternatly trying to tighten the bounds
 -- on the possible values of each symbol and substituting in values to try all possiblities
