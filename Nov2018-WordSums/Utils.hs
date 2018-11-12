@@ -37,7 +37,7 @@ dimensionOfHyperplane hyperplane = length $ normal hyperplane
 -- of the coordinate is given by coordinate.
 sectionHyperplane:: Int -> SymbolValue -> Hyperplane -> Hyperplane
 sectionHyperplane index coordinate (Hyperplane{normal=v, offset=b}) = Hyperplane {normal=newNormal, offset=newOffset}
-    where newNormal = map fst $ filter (\(x,y) -> y /= index) (zip v [0,1..])
+    where newNormal = let (front, back) = splitAt index v in front ++ tail back
           newOffset = b - (v!!index)*coordinate
 
 --performs integer division, trucating towards positive infinity
