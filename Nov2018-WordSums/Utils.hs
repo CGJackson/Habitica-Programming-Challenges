@@ -7,6 +7,7 @@ module Utils
 , Hyperplane(..)
 , normalVectorComponent
 , sectionHyperplane
+, dimensionOfHyperplane
 , divUp
 )where
 
@@ -27,6 +28,9 @@ data Hyperplane = Hyperplane {normal:: [SymbolValue],
 -- returns a given component to the normal vector to a hyperplane
 normalVectorComponent:: Hyperplane -> Int -> SymbolValue
 normalVectorComponent Hyperplane{normal=v} index = v!!index
+
+dimensionOfHyperplane:: Hyperplane -> Int
+dimensionOfHyperplane hyperplane = length $ normal hyperplane
 
 -- takes a cross section of a hyperplane normal to a coordinate axis
 -- The normal axis to the cross section is given by index, the value

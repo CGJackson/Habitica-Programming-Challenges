@@ -10,7 +10,7 @@
 -- amounts to finding the points on an N-1 dimensional
 -- hyperplane with natural number coordinates <= 9
 
-import Utils (Hyperplane(..), normalVectorComponent, sectionHyperplane, SymbolValue, SymbolRange, expandRange, divUp)
+import Utils (Hyperplane(..), normalVectorComponent, sectionHyperplane, dimensionOfHyperplane , SymbolValue, SymbolRange, expandRange, divUp)
 
 --module Solver 
 --( solve
@@ -57,8 +57,13 @@ insertValues hyperplane (guessRange:remainingRanges) = concat [[x:solution| solu
 -- Recursivly solves the Word Sum problem by alternatly trying to tighten the bounds
 -- on the possible values of each symbol and substituting in values to try all possiblities
 solve:: Hyperplane -> [SymbolRange] -> [[SymbolValue]]
-solve hyperplane ranges = maybe [] tryRemainingPossibilities newRanges
+solve hyperplane ranges 
+    | dimension /= symbolCount = error dimensionMismatchMessage
+    | otherwise = maybe [] tryRemainingPossibilities newRanges
         where newRanges = updateRanges hyperplane ranges
               tryRemainingPossibilities = insertValues hyperplane
+              dimension = dimensionOfHyperplane hyperplane
+              symbolCount = length ranges
+              dimensionMismatchMessage = "Dimension of hyperplane " ++ (if dimension < symbolCount then "less" else "greater") ++ " than the number of ranges."
               
               
