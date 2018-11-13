@@ -34,9 +34,7 @@ findNewRange hyperplane ranges index
     | newMax < newMin = Nothing
     | otherwise = Just (newMin, newMax) 
     where (lowerIntercept, upperIntercept) = intercepts hyperplane ranges index
-          currentRange = ranges!!index
-          currentMin = fst currentRange
-          currentMax = snd currentRange
+          (currentMin, currentMax) = ranges!!index
           newMin = max currentMin lowerIntercept
           newMax = min currentMax upperIntercept
 
