@@ -14,27 +14,30 @@ module Solver
 ( solve
 ) where
 
-import Utils (Hyperplane(..), normalVectorComponent, sectionHyperplane, dimensionOfHyperplane , SymbolValue, SymbolRange, expandRange, divUp)
+import qualified Data.Array as Arr
+import Utils (WordSumProblem, constructWordSumProblem, normalVectorComponent, normalVectorToList, sectionHyperplane, dimensionOfWordSumProblem, Index, RangesArray, SymbolValue, SymbolRange, NormalVector, expandRange, divUp, skipValue)
 
 
 -- Finds the largest and smallest possible values for the symbol at position 'index' consistent with the 
 -- known bounds on the other variables. This amounts to finding the points where the hyperplane 
 -- intercpets the rectangular prism defined by the bonds on the other symbols
-intercepts :: Hyperplane -> [SymbolRange] -> Int -> SymbolRange
-intercepts hyperplane ranges index = (minSum `divUp` indexCoeff, maxSum `div` indexCoeff)
-    where   indexCoeff = normalVectorComponent hyperplane index
-            parity = signum indexCoeff
-            sumTerms = [if (signum coeff) == parity then (-coeff*upperLim,-coeff*lowerLim) else (-coeff*lowerLim,-coeff*upperLim)|(i, coeff, (lowerLim, upperLim)) <- zip3 [0,1..] (normal hyperplane) ranges, i /= index]
-            (minSum, maxSum) = (foldr (\(mn,mx) (amn,amx) -> (mn+amn,mx+amx)) (offset hyperplane,offset hyperplane) sumTerms) 
+intercepts :: WordSumProblem -> Index -> SymbolRange
+intercepts problem index = (minSum `divUp` indexCoeff, maxSum `div` indexCoeff)
+    where   indexCoeff = normalVectorComponent problem index
+            extremisingSumTerms coeff (lowerBound, upperBound)
+                | (signum coeff) == (signum indexCoeff) = (-coeff*upperBound,-coeff*lowerBound)
+                | otherwise = (-coeff*lowerBound,-coeff*upperBound)
+            sumTerms = [opposingScaledRangeLimit coeff symbolBounds |(i, coeff, symbolBounds) <- zip3 [0,1..] (normalVectorToList problem) (symbolBounds problem), i /= index]
+            (minSum, maxSum) = (foldr (\(mn,mx) (amn,amx) -> (mn+amn,mx+amx)) (offset problem,offset problem) sumTerms) 
 
 -- Finds the new bounds on the range of one symbol, at position 'index',given the bounds on the other symbols
 -- and the current known maximum and minimum, given in 'currentRange'. Returns Nothing if no values are possible
-findNewRange :: Hyperplane -> [SymbolRange] -> Int -> Maybe SymbolRange
-findNewRange hyperplane ranges index 
+findNewRange :: WordSumProblem -> Index -> Maybe SymbolRange
+findNewRange problem index
     | newMax < newMin = Nothing
     | otherwise = Just (newMin, newMax) 
-    where (lowerIntercept, upperIntercept) = intercepts hyperplane ranges index
-          (currentMin, currentMax) = ranges!!index
+    where (lowerIntercept, upperIntercept) = intercepts problem index
+          (currentMin, currentMax) = (symbolBounds problem)!index
           newMin = max currentMin lowerIntercept
           newMax = min currentMax upperIntercept
 
@@ -42,28 +45,31 @@ findNewRange hyperplane ranges index
 -- returns a a new list of possible values of symbols obtained by considering
 -- where the bonds on the other variables intersect with the hyperplane
 -- returns Nothing if no integer solutions are possible
-updateRanges :: Hyperplane -> [SymbolRange] -> Maybe [SymbolRange]
-updateRanges hyperplane ranges = sequence (map updateRange (zip ranges [0,1..]))
-    where updateRange (_, index) = findNewRange hyperplane ranges index
+updatedRanges :: WordSumProblem -> Maybe RangesArray
+updatedRanges problem = toMaybeArray (map (findNewRange problem) rangeArrayIndicies)
+    where   rangeArrayBounds = Arr.bounds $ symbolBounds problem 
+            rangeArrayIndicies = Arr.range rangeArrayBounds
+            toMaybeArray = sequence . Arr.listArray rangeArrayBounds
 
 -- Explicity trys all possible values for one symbol and returns the possible results
-insertValues:: Hyperplane -> [SymbolRange] -> [[SymbolValue]]
-insertValues _ [] = []
-insertValues _ (possibleValueRange:[]) = map (:[]) (expandRange possibleValueRange)
-insertValues hyperplane (guessRange:remainingRanges) = concat $ map solutionsWithSubstitution (expandRange guessRange)
-    where solveWithSubstitution trialValue = solve (sectionHyperplane 0 trialValue hyperplane) remainingRanges
-          solutionsWithSubstitution trialValue = [trialValue:solution| solution <- (solveWithSubstitution trialValue)]
+insertTrialValues:: WordSumProblem -> [[SymbolValue]]
+insertTrialValues problem
+    | symbolsRemaining == 0 = []
+    | symbolsRemaining == 1 = map (:[]) trialValues
+    | otherwise = concat $ map solutionsWithSubstitution trialValues
+    where symbolsRemaining = dimensionOfWordSumProblem problem
+          ranges = symbolBounds problem
+          trailValues = expandRange (ranges Arr.!0)
+          remainingRanges = skipValue 0 ranges
+          problemWithTrialValue val = let (newNormal,newOffset) = sectionHyperplane 0 val problem in constructWordSumProblem newNormal newoffset remainingRanges
+          solveWithSubstitution = solve . problemWithTrialValue 
+          solutionsWithSubstitution subsValue = [trialValue:solution| solution <- (solveWithSubstitution subsValue)]
 
 -- Recursivly solves the Word Sum problem by alternatly trying to tighten the bounds
 -- on the possible values of each symbol and substituting in values to try all possiblities
-solve:: Hyperplane -> [SymbolRange] -> [[SymbolValue]]
-solve hyperplane ranges 
-    | dimension /= symbolCount = error dimensionMismatchMessage
-    | otherwise = maybe [] tryRemainingPossibilities newRanges
-        where newRanges = updateRanges hyperplane ranges
-              tryRemainingPossibilities = insertValues hyperplane
-              dimension = dimensionOfHyperplane hyperplane
-              symbolCount = length ranges
-              dimensionMismatchMessage = "Dimension of hyperplane " ++ (if dimension < symbolCount then "less" else "greater") ++ " than the number of ranges."
+solve:: WordSumProblem -> [[SymbolValue]]
+solve WordProblem{normal=normal',offset=offset',symbolBounds=currentBounds}  = maybe [] insertTrialValues reducedProblem
+        where newBounds = updatedRanges problem
+              reducedProblem = constructWordSumProblem normal' offset' newBounds
               
               
