@@ -7,10 +7,15 @@ module Utils
 , Index
 , RangesArray
 , NormalVector
-, WordSumProblem
+, WordSumProblem()
 , constructWordSumProblem
+, updateWordSumProblemBounds
 , normalVectorList
 , normalVectorComponent
+, problemOffset
+, symbolBoundsList
+, symbolBoundsArray
+, symbolBound
 , sectionHyperplane
 , dimensionOfWordSumProblem
 , divUp
@@ -27,7 +32,7 @@ type Index = Int
 
 type NormalVector = Arr.Array Index SymbolValue
 
-type RangesArray = Arr.Array Index SymbolValue
+type RangesArray = Arr.Array Index SymbolRange
 
 -- Expands a SymbolRange from a maximum and minimum value to a list of ossible values
 expandRange:: SymbolRange -> [SymbolValue]
@@ -52,6 +57,9 @@ constructWordSumProblem normal' offset' symbolBounds'
               dimBounds = alength symbolBounds'
               dimensionalMismatchErrorMessage = "Invalid WordSumProblem: Dimensions of normal vector " ++ (if dimNomral < dimBounds then "less" else "greater") ++ " than number of symbol bounds."
 
+updateWordSumProblemBounds:: WordSumProblem -> RangesArray -> WordSumProblem
+updateWordSumProblemBounds WordSumProblem{normal=normal', offset=offset'} newBounds = constructWordSumProblem normal' offset' newBounds
+
 
 -- returns the normal vector in a WordSumProblem as a list
 normalVectorList:: WordSumProblem -> [SymbolValue]
@@ -60,6 +68,18 @@ normalVectorList WordSumProblem{normal=v} = Arr.elems v
 -- returns a given component to the normal vector to a hyperplane
 normalVectorComponent:: WordSumProblem -> Index -> SymbolValue
 normalVectorComponent WordSumProblem{normal=v} index = v Arr.!index
+
+problemOffset :: WordSumProblem -> SymbolValue
+problemOffset = offset
+
+symbolBoundsList:: WordSumProblem -> [SymbolRange]
+symbolBoundsList WordSumProblem{symbolBounds=symbolBounds'} = Arr.elems symbolBounds'
+
+symbolBoundsArray:: WordSumProblem -> RangesArray
+symbolBoundsArray = symbolBounds
+
+symbolBound:: Index -> WordSumProblem -> SymbolRange
+symbolBound i WordSumProblem{symbolBounds=symbolBounds'} = symbolBounds' Arr.!i
 
 dimensionOfWordSumProblem:: WordSumProblem -> Int
 dimensionOfWordSumProblem WordSumProblem{normal=v} = Arr.rangeSize $ Arr.bounds v

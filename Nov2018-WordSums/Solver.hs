@@ -15,7 +15,7 @@ module Solver
 ) where
 
 import qualified Data.Array as Arr
-import Utils (WordSumProblem, constructWordSumProblem, normalVectorComponent, normalVectorToList, sectionHyperplane, dimensionOfWordSumProblem, Index, RangesArray, SymbolValue, SymbolRange, NormalVector, expandRange, divUp, skipValue)
+import Utils (WordSumProblem, constructWordSumProblem, updateWordSumProblemBounds, normalVectorComponent, normalVectorList, problemOffset, symbolBoundsArray, symbolBoundsList, symbolBound, sectionHyperplane, dimensionOfWordSumProblem, Index, RangesArray, SymbolValue, SymbolRange, NormalVector, expandRange, divUp, skipValue)
 
 
 -- Finds the largest and smallest possible values for the symbol at position 'index' consistent with the 
@@ -27,8 +27,8 @@ intercepts problem index = (minSum `divUp` indexCoeff, maxSum `div` indexCoeff)
             extremisingSumTerms coeff (lowerBound, upperBound)
                 | (signum coeff) == (signum indexCoeff) = (-coeff*upperBound,-coeff*lowerBound)
                 | otherwise = (-coeff*lowerBound,-coeff*upperBound)
-            sumTerms = [opposingScaledRangeLimit coeff symbolBounds |(i, coeff, symbolBounds) <- zip3 [0,1..] (normalVectorToList problem) (symbolBounds problem), i /= index]
-            (minSum, maxSum) = (foldr (\(mn,mx) (amn,amx) -> (mn+amn,mx+amx)) (offset problem,offset problem) sumTerms) 
+            sumTerms = [extremisingSumTerms coeff symbolBounds |(i, coeff, symbolBounds) <- zip3 [0,1..] (normalVectorList problem) (symbolBoundsList problem), i /= index]
+            (minSum, maxSum) = (foldr (\(mn,mx) (amn,amx) -> (mn+amn,mx+amx)) (problemOffset problem,problemOffset problem) sumTerms) 
 
 -- Finds the new bounds on the range of one symbol, at position 'index',given the bounds on the other symbols
 -- and the current known maximum and minimum, given in 'currentRange'. Returns Nothing if no values are possible
@@ -37,7 +37,7 @@ findNewRange problem index
     | newMax < newMin = Nothing
     | otherwise = Just (newMin, newMax) 
     where (lowerIntercept, upperIntercept) = intercepts problem index
-          (currentMin, currentMax) = (symbolBounds problem)!index
+          (currentMin, currentMax) = symbolBound index problem
           newMin = max currentMin lowerIntercept
           newMax = min currentMax upperIntercept
 
@@ -47,7 +47,7 @@ findNewRange problem index
 -- returns Nothing if no integer solutions are possible
 updatedRanges :: WordSumProblem -> Maybe RangesArray
 updatedRanges problem = toMaybeArray (map (findNewRange problem) rangeArrayIndicies)
-    where   rangeArrayBounds = Arr.bounds $ symbolBounds problem 
+    where   rangeArrayBounds = Arr.bounds $ symbolBoundsArray problem 
             rangeArrayIndicies = Arr.range rangeArrayBounds
             toMaybeArray = sequence . Arr.listArray rangeArrayBounds
 
@@ -58,18 +58,18 @@ insertTrialValues problem
     | symbolsRemaining == 1 = map (:[]) trialValues
     | otherwise = concat $ map solutionsWithSubstitution trialValues
     where symbolsRemaining = dimensionOfWordSumProblem problem
-          ranges = symbolBounds problem
-          trailValues = expandRange (ranges Arr.!0)
+          ranges = symbolBoundsArray problem
+          trialValues = expandRange (ranges Arr.!0)
           remainingRanges = skipValue 0 ranges
-          problemWithTrialValue val = let (newNormal,newOffset) = sectionHyperplane 0 val problem in constructWordSumProblem newNormal newoffset remainingRanges
+          problemWithTrialValue val = let (newNormal,newOffset) = sectionHyperplane 0 val problem in constructWordSumProblem newNormal newOffset remainingRanges
           solveWithSubstitution = solve . problemWithTrialValue 
-          solutionsWithSubstitution subsValue = [trialValue:solution| solution <- (solveWithSubstitution subsValue)]
+          solutionsWithSubstitution subsValue = [subsValue:solution| solution <- (solveWithSubstitution subsValue)]
 
 -- Recursivly solves the Word Sum problem by alternatly trying to tighten the bounds
 -- on the possible values of each symbol and substituting in values to try all possiblities
 solve:: WordSumProblem -> [[SymbolValue]]
-solve WordProblem{normal=normal',offset=offset',symbolBounds=currentBounds}  = maybe [] insertTrialValues reducedProblem
-        where newBounds = updatedRanges problem
-              reducedProblem = constructWordSumProblem normal' offset' newBounds
+solve problem  = maybe [] insertTrialValues reducedProblem
+        where reducedProblem = fmap (updateWordSumProblemBounds problem) (updatedRanges problem)
+              
               
               
