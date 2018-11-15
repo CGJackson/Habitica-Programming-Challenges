@@ -7,14 +7,12 @@ module Utils
 , Index
 , RangesArray
 , NormalVector
-, WordSumProblem()
+, WordSumProblem(offset,symbolBounds,normal)
 , constructWordSumProblem
 , updateWordSumProblemBounds
 , normalVectorList
 , normalVectorComponent
-, problemOffset
 , symbolBoundsList
-, symbolBoundsArray
 , symbolBound
 , sectionHyperplane
 , dimensionOfWordSumProblem

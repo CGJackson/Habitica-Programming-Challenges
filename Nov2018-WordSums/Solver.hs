@@ -15,7 +15,7 @@ module Solver
 ) where
 
 import qualified Data.Array as Arr
-import Utils (WordSumProblem, constructWordSumProblem, updateWordSumProblemBounds, normalVectorComponent, normalVectorList, problemOffset, symbolBoundsArray, symbolBoundsList, symbolBound, sectionHyperplane, dimensionOfWordSumProblem, Index, RangesArray, SymbolValue, SymbolRange, NormalVector, expandRange, divUp, skipValue)
+import Utils (WordSumProblem(offset,symbolBounds), constructWordSumProblem, updateWordSumProblemBounds, normalVectorComponent, normalVectorList, symbolBoundsList, symbolBound, sectionHyperplane, dimensionOfWordSumProblem, Index, RangesArray, SymbolValue, SymbolRange, NormalVector, expandRange, divUp, skipValue)
 
 
 -- Finds the largest and smallest possible values for the symbol at position 'index' consistent with the 
@@ -28,7 +28,7 @@ intercepts problem index = (minSum `divUp` indexCoeff, maxSum `div` indexCoeff)
                 | (signum coeff) == (signum indexCoeff) = (-coeff*upperBound,-coeff*lowerBound)
                 | otherwise = (-coeff*lowerBound,-coeff*upperBound)
             sumTerms = [extremisingSumTerms coeff symbolBounds |(i, coeff, symbolBounds) <- zip3 [0,1..] (normalVectorList problem) (symbolBoundsList problem), i /= index]
-            (minSum, maxSum) = (foldr (\(mn,mx) (amn,amx) -> (mn+amn,mx+amx)) (problemOffset problem,problemOffset problem) sumTerms) 
+            (minSum, maxSum) = (foldr (\(mn,mx) (amn,amx) -> (mn+amn,mx+amx)) (offset problem,offset problem) sumTerms) 
 
 -- Finds the new bounds on the range of one symbol, at position 'index',given the bounds on the other symbols
 -- and the current known maximum and minimum, given in 'currentRange'. Returns Nothing if no values are possible
@@ -47,7 +47,7 @@ findNewRange problem index
 -- returns Nothing if no integer solutions are possible
 updatedRanges :: WordSumProblem -> Maybe RangesArray
 updatedRanges problem = toMaybeArray (map (findNewRange problem) rangeArrayIndicies)
-    where   rangeArrayBounds = Arr.bounds $ symbolBoundsArray problem 
+    where   rangeArrayBounds = Arr.bounds $ symbolBounds problem 
             rangeArrayIndicies = Arr.range rangeArrayBounds
             toMaybeArray = sequence . Arr.listArray rangeArrayBounds
 
@@ -58,7 +58,7 @@ insertTrialValues problem
     | symbolsRemaining == 1 = map (:[]) trialValues
     | otherwise = concat $ map solutionsWithSubstitution trialValues
     where symbolsRemaining = dimensionOfWordSumProblem problem
-          ranges = symbolBoundsArray problem
+          ranges = symbolBounds problem
           trialValues = expandRange (ranges Arr.!0)
           remainingRanges = skipValue 0 ranges
           problemWithTrialValue val = let (newNormal,newOffset) = sectionHyperplane 0 val problem in constructWordSumProblem newNormal newOffset remainingRanges
