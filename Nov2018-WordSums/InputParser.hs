@@ -6,6 +6,7 @@ module InputParser
 ) where
 
 import Control.Monad (foldM)
+import Data.Either (either)
 import qualified Data.Map as Map
 import qualified Data.Char as Char
 
@@ -24,11 +25,13 @@ data InputStringData = InputStringData{symbolData::(Map.Map Char SymbolData), co
 
 -- maps a function over the symbol coefficents of an InputStringData
 mapC:: (SymbolValue -> SymbolValue) -> InputStringData -> InputStringData
-mapC f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(map (\(x,l)->(f x,l)) symbols), constantTotal=c}
+mapC f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(Map.map applyToSymbolData symbols), constantTotal=c}
+    where applyToSymbolData SymbolData{coefficent=coef, leadingSymbol=l} = SymbolData{coefficent=(f coef), leadingSymbol=l}
 
 -- maps a function over the symbol coefficents and constantTotal of an InputStringData
 mapCO:: (SymbolValue -> SymbolValue) -> InputStringData -> InputStringData
-mapCO f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(map (\(x,l)->(f x,l)) symbols), constantTotal=(f c)}
+mapCO f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(Map.map applyToSymbolData symbols), constantTotal=(f c)}
+    where applyToSymbolData SymbolData{coefficent=coef, leadingSymbol=l} = SymbolData{coefficent=(f coef), leadingSymbol=l}
 
 -- Combines the data from 2 'independant' parts of the input, for example 2 different words,
 combineWordData:: InputStringData -> InputStringData -> InputStringData
@@ -54,8 +57,8 @@ negateIf False = id
 parseSymbol:: Bool -> InputStringData -> Char -> Either ErrorMessage InputStringData
 parseSymbol isLeading previousSymbols c
     | Char.isDigit c = Right InputStringData{symbolData=symbols', constantTotal=(offset+(Char.digitToInt c))}
-    | Char.isLetter c = Right InputStringData{symbolData=(Map.insertWith (+) c (1,isLeading) symbols'), constantTotal=offset}
-    | otherwise = Left "Invalid character " ++ [c]
+    | Char.isLetter c = Right InputStringData{symbolData=(Map.insertWith suplementSymbolData c SymbolData{coefficent=1,leadingSymbol=isLeading} symbols'), constantTotal=offset}
+    | otherwise = Left ("Invalid character " ++ [c])
     where InputStringData{symbolData=symbols', constantTotal=offset} = shiftDigitsLeft previousSymbols
 
 -- Processes a string containing a single word and returns the contribution of that
@@ -63,6 +66,9 @@ parseSymbol isLeading previousSymbols c
 -- characters returns an error message. 
 parseWord:: String -> Either ErrorMessage InputStringData
 parseWord [] = Right InputStringData{symbolData=Map.empty, constantTotal=0}
-parseWord (leadingC:remainingCs) = foldM parseNonLeadingCharacter leadingCharacterData remainingCs
+parseWord (leadingC:remainingCs) = either Left parseRemainingCs leadingCharacterData
     where leadingCharacterData = parseSymbol True InputStringData{symbolData=Map.empty, constantTotal=0} leadingC 
           parseNonLeadingCharacter = parseSymbol False
+          parseRemainingCs validLeadingCData = foldM parseNonLeadingCharacter validLeadingCData remainingCs
+
+parser = "TODO"
