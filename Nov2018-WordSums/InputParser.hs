@@ -10,7 +10,7 @@ import Data.Either (either)
 import qualified Data.Map as Map
 import qualified Data.Char as Char
 
-import Utils (SymbolValue)
+import Utils (SymbolValue, startsWith)
 
 type ErrorMessage = String
 
@@ -70,5 +70,51 @@ parseWord (leadingC:remainingCs) = either Left parseRemainingCs leadingCharacter
     where leadingCharacterData = parseSymbol True InputStringData{symbolData=Map.empty, constantTotal=0} leadingC 
           parseNonLeadingCharacter = parseSymbol False
           parseRemainingCs validLeadingCData = foldM parseNonLeadingCharacter validLeadingCData remainingCs
+
+-- Splits string into words at +, - or =
+splitIntoWords:: String -> [String]
+splitIntoWords [] = []
+splitIntoWords ('+':str) = ['+':word]++(splitIntoWords remainder)
+    where (word,remainder) = break (\c -> (c=='+')||(c=='=')||(c=='-')) str
+splitIntoWords ('=':str) = ['=':word]++(splitIntoWords remainder)
+    where (word,remainder) = break (\c -> (c=='+')||(c=='=')||(c=='-')) str
+splitIntoWords ('-':str) = ['-':word]++(splitIntoWords remainder)
+    where (word,remainder) = break (\c -> (c=='+')||(c=='=')||(c=='-')) str
+splitIntoWords str = [word]++(splitIntoWords remainder)
+    where (word,remainder) = break (\c -> (c=='+')||(c=='=')||(c=='-')) str
+          
+-- Finds the sign in the sum of a word
+signWord:: String -> (String,Bool)
+signWord ('+':word) = (word,False)
+signWord ('-':word) = (word,True)
+signWord word = (word,False)
+
+-- Reverses the sign on all terms on the right hand side of the equation, effectively subtracting them accross to the left hand side
+-- Also stips out = sign and returns error messages if there is not exactly one equals sign
+bringTermsToLeft:: [(String,Bool)] -> Either ErrorMessage [(String,Bool)]
+bringTermsToLeft words 
+    | rightHandSideTerms == [] = Left "No equals sign in word sum"
+    | containSecondEqauals = Left "Word sum contained multiple equals signs"
+    | otherwise = Right $ leftHandSideTerms ++ (map (\(w,s)->(w,not s)) equalsStripedRightHandSide)
+    where wordStartsWithEquals (word,sign) = startsWith '=' word
+          (leftHandSideTerms,rightHandSideTerms) = break wordStartsWithEquals words
+          equalsStripedRightHandSide = let (('=':word,sign):rhs) = rightHandSideTerms in (word,sign):rhs
+          containSecondEqauals = any wordStartsWithEquals equalsStripedRightHandSide
+          
+-- removes whitespace and case dependancies from input
+sanatizeInput:: String -> String
+sanatizeInput = (map Char.toUpper).(filter (not.Char.isSpace))
+
+parseWordSumExpression:: String -> Either ErrorMessage InputStringData
+parseWordSumExpression str 
+    | any (\w -> (w=="+")||(w=="-")) words = Left "Word sum contains repreated operators with no term in between"
+    | otherwise = fmap (foldr combineWordData emptyWordData) wordData
+    where words = (splitIntoWords.sanatizeInput) str 
+          signedWords = bringTermsToLeft $ (map signWord) words
+          wordData = signedWords >>= (sequence.(map (\(w,s)->(fmap (negateIf s) (parseWord w)))))
+          emptyWordData = InputStringData{symbolData=Map.empty, constantTotal=0}
+          
+          
+
 
 parser = "TODO"

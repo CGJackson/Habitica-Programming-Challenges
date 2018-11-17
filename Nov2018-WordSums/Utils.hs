@@ -18,6 +18,7 @@ module Utils
 , dimensionOfWordSumProblem
 , divUp
 , skipValue
+, startsWith
 )where
 
 import qualified Data.Array as Arr
@@ -104,3 +105,7 @@ divUp n d
     |remainder == 0 = quotent
     |otherwise = quotent + 1
     where (quotent, remainder) = n `divMod` d
+
+startsWith:: (Eq a) => a -> [a] -> Bool
+startsWith _ [] = False
+startsWith y (x:xs) = y == x
