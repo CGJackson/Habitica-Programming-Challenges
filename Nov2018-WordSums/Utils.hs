@@ -1,7 +1,8 @@
 -- Contains utility types and function for word sum solver
 
 module Utils
-( SymbolValue
+( ErrorMessage
+, SymbolValue
 , SymbolRange
 , expandRange
 , Index
@@ -16,12 +17,24 @@ module Utils
 , symbolBound
 , sectionHyperplane
 , dimensionOfWordSumProblem
+, SymbolData(..)
+, suplementSymbolData
+, InputStringData(..)
+, mapC
+, mapCO
+, combineWordData
+, convertInputData
 , divUp
 , skipValue
 , startsWith
+, splitPairsList
 )where
 
 import qualified Data.Array as Arr
+import Data.Map as Map
+import Data.List (sortBy)
+
+type ErrorMessage = String
 
 type SymbolValue = Int
 
@@ -91,6 +104,48 @@ sectionHyperplane index coordinate (WordSumProblem{normal=v, offset=b}) = (newNo
     where newNormal = skipValue index v
           newOffset = b - (v Arr.!index)*coordinate
 
+
+-- Contains the information about a single symbol in th input
+data SymbolData = SymbolData{coefficent::SymbolValue, leadingSymbol::Bool} deriving (Show, Eq)
+
+instance Ord SymbolData where
+    SymbolData{coefficent=c1} <= SymbolData{coefficent=c2} = (abs c1) <= (abs c2) 
+
+suplementSymbolData:: SymbolData -> SymbolData -> SymbolData
+suplementSymbolData SymbolData{coefficent=coef1,leadingSymbol=leading1} SymbolData{coefficent=coef2,leadingSymbol=leading2} = SymbolData{coefficent=(coef1+coef2),leadingSymbol=(leading1 || leading2)}
+
+-- Stores data about the input string at in intermediary stage of processing the input
+data InputStringData = InputStringData{symbolData::(Map.Map Char SymbolData), constantTotal::SymbolValue} deriving (Show,Eq)
+
+-- maps a function over the symbol coefficents of an InputStringData
+mapC:: (SymbolValue -> SymbolValue) -> InputStringData -> InputStringData
+mapC f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(Map.map applyToSymbolData symbols), constantTotal=c}
+    where applyToSymbolData SymbolData{coefficent=coef, leadingSymbol=l} = SymbolData{coefficent=(f coef), leadingSymbol=l}
+
+-- maps a function over the symbol coefficents and constantTotal of an InputStringData
+mapCO:: (SymbolValue -> SymbolValue) -> InputStringData -> InputStringData
+mapCO f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(Map.map applyToSymbolData symbols), constantTotal=(f c)}
+    where applyToSymbolData SymbolData{coefficent=coef, leadingSymbol=l} = SymbolData{coefficent=(f coef), leadingSymbol=l}
+
+-- Combines the data from 2 'independant' parts of the input, for example 2 different words,
+combineWordData:: InputStringData -> InputStringData -> InputStringData
+combineWordData InputStringData{symbolData=symbols1, constantTotal=offset1} InputStringData{symbolData=symbols2, constantTotal=offset2} = InputStringData{symbolData=newSymbolData, constantTotal=(offset1+offset2)}
+    where newSymbolData = Map.unionWith suplementSymbolData symbols1 symbols2
+
+-- Converts an InputStringData into a WordSumProblem and a list of the letters
+-- Both the coefficents in the WordSumProblem and the characters in the list of
+-- Symbols are given in order of increasing magnitude of the cooefcient, 
+-- in particular they are in the same order in both cases
+convertInputData:: InputStringData -> (WordSumProblem, [Char])
+convertInputData InputStringData{symbolData=symbols, constantTotal=const} = (constructWordSumProblem normalVector const symbolBounds, symbolList)
+    where (symbolList, dataList) = splitPairsList $ (sortBy (\(c,d) (b,e) -> e `compare` d)) $ Map.toList symbols
+          (coefList, leadingSymbolList) = splitPairsList $ Prelude.map (\SymbolData{coefficent=c,leadingSymbol=l}->(c,l)) dataList
+          arrayBounds = (0, (length symbolList) - 1)
+          normalVector = Arr.listArray arrayBounds coefList
+          symbolRange True = (1,9)
+          symbolRange False = (0,9)
+          symbolBounds = Arr.listArray arrayBounds $ Prelude.map symbolRange leadingSymbolList
+
 -- Given an index and an array returns a new array with the same lower bound and the upper bound reduced by one
 -- The elements of the new array are the same as the old one but the value with the given index is missing
 skipValue:: (Arr.Ix a, Num a) => a -> Arr.Array a b -> Arr.Array a b
@@ -109,3 +164,10 @@ divUp n d
 startsWith:: (Eq a) => a -> [a] -> Bool
 startsWith _ [] = False
 startsWith y (x:xs) = y == x
+
+-- splits a list of pairs into a pair of lists 
+splitPairsList:: [(a,b)] -> ([a],[b])
+splitPairsList [] = ([],[])
+splitPairsList ((x,y):rem) = (x:xs,y:ys)
+    where (xs,ys) = splitPairsList rem
+

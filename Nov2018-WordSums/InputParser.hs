@@ -10,33 +10,8 @@ import Data.Either (either)
 import qualified Data.Map as Map
 import qualified Data.Char as Char
 
-import Utils (SymbolValue, startsWith)
+import Utils (SymbolValue, SymbolData(..), ErrorMessage, InputStringData(..), WordSumProblem, suplementSymbolData, combineWordData, convertInputData, mapC, mapCO, startsWith)
 
-type ErrorMessage = String
-
--- Contains the information about a single symbol in th input
-data SymbolData = SymbolData{coefficent::SymbolValue, leadingSymbol::Bool} deriving (Show, Eq)
-
-suplementSymbolData:: SymbolData -> SymbolData -> SymbolData
-suplementSymbolData SymbolData{coefficent=coef1,leadingSymbol=leading1} SymbolData{coefficent=coef2,leadingSymbol=leading2} = SymbolData{coefficent=(coef1+coef2),leadingSymbol=(leading1 || leading2)}
-
--- Stores data about the input string at in intermediary stage of processing the input
-data InputStringData = InputStringData{symbolData::(Map.Map Char SymbolData), constantTotal::SymbolValue} deriving (Show,Eq)
-
--- maps a function over the symbol coefficents of an InputStringData
-mapC:: (SymbolValue -> SymbolValue) -> InputStringData -> InputStringData
-mapC f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(Map.map applyToSymbolData symbols), constantTotal=c}
-    where applyToSymbolData SymbolData{coefficent=coef, leadingSymbol=l} = SymbolData{coefficent=(f coef), leadingSymbol=l}
-
--- maps a function over the symbol coefficents and constantTotal of an InputStringData
-mapCO:: (SymbolValue -> SymbolValue) -> InputStringData -> InputStringData
-mapCO f InputStringData{symbolData=symbols, constantTotal=c} = InputStringData{symbolData=(Map.map applyToSymbolData symbols), constantTotal=(f c)}
-    where applyToSymbolData SymbolData{coefficent=coef, leadingSymbol=l} = SymbolData{coefficent=(f coef), leadingSymbol=l}
-
--- Combines the data from 2 'independant' parts of the input, for example 2 different words,
-combineWordData:: InputStringData -> InputStringData -> InputStringData
-combineWordData InputStringData{symbolData=symbols1, constantTotal=offset1} InputStringData{symbolData=symbols2, constantTotal=offset2} = InputStringData{symbolData=newSymbolData, constantTotal=(offset1+offset2)}
-    where newSymbolData = Map.unionWith suplementSymbolData symbols1 symbols2
 
 -- Changes the sign on coefficents and constant in InputStringData object
 negateWordData:: InputStringData -> InputStringData
@@ -114,7 +89,6 @@ parseWordSumExpression str
           wordData = signedWords >>= (sequence.(map (\(w,s)->(fmap (negateIf s) (parseWord w)))))
           emptyWordData = InputStringData{symbolData=Map.empty, constantTotal=0}
           
+parser:: String -> Either ErrorMessage (WordSumProblem, [Char])
+parser str = fmap convertInputData $ parseWordSumExpression str
           
-
-
-parser = "TODO"
