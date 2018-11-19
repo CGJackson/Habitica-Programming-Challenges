@@ -14,6 +14,7 @@ module Solver
 ( solve
 ) where
 
+import qualified Data.Sequence as Seq
 import qualified Data.Array as Arr
 import Utils (WordSumProblem(offset,symbolBounds), constructWordSumProblem, updateWordSumProblemBounds, normalVectorComponent, normalVectorList, symbolBoundsList, symbolBound, sectionHyperplane, dimensionOfWordSumProblem, Index, RangesArray, SymbolValue, SymbolRange, NormalVector, expandRange, divUp, skipValue)
 
@@ -21,12 +22,14 @@ import Utils (WordSumProblem(offset,symbolBounds), constructWordSumProblem, upda
 -- Finds the largest and smallest possible values for the symbol at position 'index' consistent with the 
 -- known bounds on the other variables. This amounts to finding the points where the hyperplane 
 -- intercpets the rectangular prism defined by the bonds on the other symbols
-intercepts :: WordSumProblem -> Index -> SymbolRange
+intercepts :: WordSumProblem -> Index -> (SymbolValue.SymbolValue)
 intercepts problem index = (minSum `divUp` indexCoeff, maxSum `div` indexCoeff)
     where   indexCoeff = normalVectorComponent problem index
-            extremisingSumTerms coeff (lowerBound, upperBound)
+            extremisingSumTerms coeff valueRange
                 | (signum coeff) == (signum indexCoeff) = (-coeff*upperBound,-coeff*lowerBound)
                 | otherwise = (-coeff*lowerBound,-coeff*upperBound)
+                    where lowerBound Seq.:< _ = Seq.viewL valueRange
+                          _ Seq.>: upperBound = Seq.viewR valueRange
             sumTerms = [extremisingSumTerms coeff symbolBounds |(i, coeff, symbolBounds) <- zip3 [0,1..] (normalVectorList problem) (symbolBoundsList problem), i /= index]
             (minSum, maxSum) = (foldr (\(mn,mx) (amn,amx) -> (mn+amn,mx+amx)) (offset problem,offset problem) sumTerms) 
 
@@ -34,22 +37,20 @@ intercepts problem index = (minSum `divUp` indexCoeff, maxSum `div` indexCoeff)
 -- and the current known maximum and minimum, given in 'currentRange'. Returns Nothing if no values are possible
 findNewRange :: WordSumProblem -> Index -> Maybe SymbolRange
 findNewRange problem index
-    | newMax < newMin = Nothing
+    | Seq.null newRange = Nothing
     | otherwise = Just (newMin, newMax) 
     where (lowerIntercept, upperIntercept) = intercepts problem index
-          (currentMin, currentMax) = symbolBound index problem
-          newMin = max currentMin lowerIntercept
-          newMax = min currentMax upperIntercept
+          newRange = Seq.dropWhileL (<lowerIntercept) $ Seq.dropWhileR (>upperIntercept) (symbolBound index problem)
 
 -- Given a hyperplane and a list of ranges of possible values for symbols
 -- returns a a new list of possible values of symbols obtained by considering
 -- where the bonds on the other variables intersect with the hyperplane
 -- returns Nothing if no integer solutions are possible
 updatedRanges :: WordSumProblem -> Maybe RangesArray
-updatedRanges problem = toMaybeArray (map (findNewRange problem) rangeArrayIndicies)
+updatedRanges problem = listToMaybeArray (map (findNewRange problem) rangeArrayIndicies)
     where   rangeArrayBounds = Arr.bounds $ symbolBounds problem 
             rangeArrayIndicies = Arr.range rangeArrayBounds
-            toMaybeArray = sequence . Arr.listArray rangeArrayBounds
+            listToMaybeArray = sequence . Arr.listArray rangeArrayBounds
 
 -- Explicity trys all possible values for one symbol and returns the possible results
 insertTrialValues:: WordSumProblem -> [[SymbolValue]]
@@ -59,9 +60,9 @@ insertTrialValues problem
     | otherwise = concat $ map solutionsWithSubstitution trialValues
     where symbolsRemaining = dimensionOfWordSumProblem problem
           ranges = symbolBounds problem
-          trialValues = expandRange (ranges Arr.!0)
-          remainingRanges = skipValue 0 ranges
-          problemWithTrialValue val = let (newNormal,newOffset) = sectionHyperplane 0 val problem in constructWordSumProblem newNormal newOffset remainingRanges
+          trialValues = ranges Arr.!0
+          remainingRanges trialVal = let _:rs = (Arr.elem ranges) in Arr.listArray (0, symbolsRemaining -1) $ map (deleteValueL trialVal) rs
+          problemWithTrialValue val = let (newNormal,newOffset) = sectionHyperplane 0 val problem in constructWordSumProblem newNormal newOffset (remainingRanges val)
           solveWithSubstitution = solve . problemWithTrialValue 
           solutionsWithSubstitution subsValue = [subsValue:solution| solution <- (solveWithSubstitution subsValue)]
 
