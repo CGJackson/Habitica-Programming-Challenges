@@ -31,7 +31,7 @@ negateIf False = id
 -- Shifts the data for previous characters to account for the fact that the represent more significant digits.
 parseSymbol:: Bool -> InputStringData -> Char -> Either ErrorMessage InputStringData
 parseSymbol isLeading previousSymbols c
-    | Char.isDigit c = Right InputStringData{symbolData=symbols', constantTotal=(offset+(Char.digitToInt c))}
+    | Char.isDigit c = Right InputStringData{symbolData=symbols', constantTotal=(offset-(Char.digitToInt c))}
     | Char.isLetter c = Right InputStringData{symbolData=(Map.insertWith suplementSymbolData c SymbolData{coefficent=1,leadingSymbol=isLeading} symbols'), constantTotal=offset}
     | otherwise = Left ("Invalid character " ++ [c])
     where InputStringData{symbolData=symbols', constantTotal=offset} = shiftDigitsLeft previousSymbols
