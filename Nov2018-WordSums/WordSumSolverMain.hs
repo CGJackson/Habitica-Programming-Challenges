@@ -1,6 +1,7 @@
 
 import Data.Char (toLower)
-import Utils (SymbolValue, ErrorMessage, WordSumProblem)
+import Data.List (partition)
+import Utils (SymbolValue, ErrorMessage, WordSumProblem, allUnique)
 import Solver (solve)
 import InputParser (parser)
 
@@ -12,14 +13,19 @@ formatResults:: [Char] -> [[SymbolValue]] -> String
 formatResults symbolKey = concat . (map (formatSolution symbolKey)) 
 
 printResult:: [Char] -> [[SymbolValue]] -> IO ()
-printResult symbolKey = putStrLn .(formatResults symbolKey) 
+printResult _ [] = putStrLn "None"
+printResult symbolKey solutions = putStrLn $ formatResults symbolKey solutions 
 
 invalidInput:: ErrorMessage -> IO ()
 invalidInput message = do putStrLn ("Invalid input: " ++ message)
                           main
 
 solveAndPrint:: (WordSumProblem,[Char]) -> IO ()
-solveAndPrint (problem, symbolKey) = (printResult symbolKey) (solve problem)
+solveAndPrint (problem, symbolKey) = do putStrLn "Solutions with all values unique"
+                                        printResult symbolKey uniqueVals 
+                                        putStrLn "Solutions which include duplicated values"
+                                        printResult symbolKey dupVals
+    where (uniqueVals, dupVals) = partition allUnique $ solve problem
 
 repeatProgram:: Char -> IO ()
 repeatProgram 'y' = do getLine -- Clears input line befor restarting

@@ -4,6 +4,7 @@ module Utils
 ( ErrorMessage
 , SymbolValue
 , SymbolRange
+, expandRange
 , Index
 , RangesArray
 , NormalVector
@@ -24,28 +25,33 @@ module Utils
 , combineWordData
 , convertInputData
 , divUp
-, deleteValueL
 , skipValue
 , startsWith
 , splitPairsList
+, allUnique
 )where
 
 import qualified Data.Array as Arr
-import qualified Data.Map as Map
+import Data.Map as Map
 import Data.List (sortBy)
-import qualified Data.Sequence as Seq
 
 type ErrorMessage = String
 
 type SymbolValue = Int
 
-type SymbolRange = Seq.Seq SymbolValue
+type SymbolRange = (SymbolValue, SymbolValue)
 
 type Index = Int
 
 type NormalVector = Arr.Array Index SymbolValue
 
 type RangesArray = Arr.Array Index SymbolRange
+
+-- Expands a SymbolRange from a maximum and minimum value to a list of ossible values
+expandRange:: SymbolRange -> [SymbolValue]
+expandRange (lowerBound, upperBound)
+    | lowerBound > upperBound = error "Invalid symbol range: Lower bound greater than upper bound"
+    | otherwise = [lowerBound..upperBound]
 
 data WordSumProblem = WordSumProblem {normal:: NormalVector,
                                       offset:: SymbolValue,
@@ -137,8 +143,8 @@ convertInputData InputStringData{symbolData=symbols, constantTotal=const} = (con
           (coefList, leadingSymbolList) = splitPairsList $ Prelude.map (\SymbolData{coefficent=c,leadingSymbol=l}->(c,l)) dataList
           arrayBounds = (0, (length symbolList) - 1)
           normalVector = Arr.listArray arrayBounds coefList
-          symbolRange True = Seq.fromList [1..9]
-          symbolRange False = Seq.fromList[0..9]
+          symbolRange True = (1,9)
+          symbolRange False = (0,9)
           symbolBounds = Arr.listArray arrayBounds $ Prelude.map symbolRange leadingSymbolList
 
 -- Given an index and an array returns a new array with the same lower bound and the upper bound reduced by one
@@ -149,13 +155,6 @@ skipValue skipIndex array = Arr.ixmap (lowerBnd, upperBnd-1) indexSkipper array
           indexSkipper i | i < skipIndex = i
                          | i >= skipIndex = i + 1
 
--- deletes the first occurence of a given value from a sequence starting form the left.
--- If the value does not occure the original sequence is returned
-deleteValueL:: (Eq a) => a -> Seq.Seq a -> Seq.Seq a
-deleteValueL val sequ
-    | isNothing firstOccurence = sequ
-    | otherwise = Seq.deleteAt firstOccurence sequ
-    where firstOccurence = elemIndexL sequ
 --performs integer division, trucating towards positive infinity
 divUp ::(Integral a) => a -> a -> a
 divUp n d
@@ -173,3 +172,8 @@ splitPairsList [] = ([],[])
 splitPairsList ((x,y):rem) = (x:xs,y:ys)
     where (xs,ys) = splitPairsList rem
 
+-- returns True if all elements of a list a distinct
+-- is vacuously true for an empty list
+allUnique::(Eq a) => [a] -> Bool
+allUnique [] = True
+allUnique (x:xs) = (notElem x xs) && allUnique xs
